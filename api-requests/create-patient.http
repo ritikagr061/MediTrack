@@ -1,0 +1,12 @@
+### POST request to save a new patient
+POST http://localhost:5001/patients
+Content-Type: application/json
+
+{
+  "name": "joahna ass",
+  "email": "johnaass1@gmail.com",
+  "address": "202, Neville Street, NY Stallion, NYC",
+  "dateOfBirth": "2000-06-21",
+  "registeredDate": "2024-05-31"
+}
+###

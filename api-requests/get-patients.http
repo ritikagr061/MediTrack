@@ -1,0 +1,3 @@
+### GET request to fetch all patient listings
+GET http://localhost:5001/patients
+###

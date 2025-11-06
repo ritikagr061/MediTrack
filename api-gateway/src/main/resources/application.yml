@@ -1,0 +1,58 @@
+server:
+  port: 5004
+
+spring:
+  application:
+    name: api-gateway
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          secret-key: 5XW4T0T1y6nC9xX4rj2Q4ePQVwHZGk6rJTTZf84B4yM=
+
+  cloud:
+    gateway:
+      routes:
+        - id: patient-service-route
+          uri: http://patient-service:5001
+          predicates:
+            - Path=/api/patients/**
+            - Method=GET
+            - Method=POST
+            - Method=PUT
+            - Method=DELETE
+          filters:
+            - StripPrefix=1
+          ## filters are used to modify the request before forwarding it to the destination service.
+          ## Here, strip-prefix=1 removes the first segment of the path (i.e., "api") before forwarding the request to the patient-service.
+            #        - id: appointment-service-route
+            #          uri: http://appointment-service:5002
+
+      #########################################################
+      #  GLOBAL CORS CONFIGURATION
+      #########################################################
+      globalcors:
+        corsConfigurations:
+          '[/**]':                                 # Apply these rules to all paths (/**)
+            allowedOrigins:                        # Frontend origins that can call this API
+              - "http://localhost"                 # Allow localhost without port restriction
+              - "http://localhost:*"               # Allow all localhost ports (e.g., 3000, 5173)
+              - "http://127.0.0.1"                 # Allow 127.0.0.1 (some browsers treat differently)
+              - "http://127.0.0.1:*"               # Allow all 127.0.0.1 ports
+            allowedMethods:                        # HTTP methods allowed from frontend
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: ["*"]                  # Allow any request header from frontend (e.g., Authorization, Content-Type)
+            exposedHeaders:                        # Headers that JS in frontend is allowed to read from the response, note what you see in inspect != what JS can access
+              - "Authorization"                    # e.g., if you send back a refreshed token
+              - "X-Correlation-Id"                 # e.g., for request tracing/logging in UI
+            allowCredentials: true                 # Allow sending cookies or Authorization headers in CORS requests
+            maxAge: 3600                           # Cache preflight (OPTIONS) response for 1 hour in the browser
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin RETAIN_UNIQUE
+        # Removes duplicate 'Access-Control-Allow-*' headers that can appear
+        # when multiple filters or layers add the same header.
