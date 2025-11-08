@@ -55,7 +55,7 @@ WORKDIR /app
 COPY --from=builder /app/target/*.jar /app/app.jar
 
 # Declare the port your Spring Boot app listens on (informational for users/tools).
-# Progress so far: Consumers of the image know the service expects to listen on 5004.
+# Progress so far: Consumers of the image know the service expects to listen on 8080.
 EXPOSE 8080
 
 # Start the Spring Boot application.
