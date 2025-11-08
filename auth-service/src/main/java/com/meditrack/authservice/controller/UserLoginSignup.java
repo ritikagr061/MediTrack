@@ -37,7 +37,6 @@ public class UserLoginSignup {
                             .emailId(req.getEmailId())
                             .phoneNumber(req.getPhoneNumber())
                             .password(req.getPassword())
-                            .membership("None")
                             .build();
 
         UserRegisterResponse response = userService.saveUser(user);

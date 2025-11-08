@@ -1,0 +1,10 @@
+### POST request to example server
+POST http://localhost:5006/auth/register-user
+Content-Type: application/json
+
+{
+  "userName": "ritik1",
+  "emailId": "ritik1@example.com",
+  "password": "password",
+  "phoneNumber": "7838165411"
+}

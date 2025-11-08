@@ -9,13 +9,13 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          secret-key: 5XW4T0T1y6nC9xX4rj2Q4ePQVwHZGk6rJTTZf84B4yM=
+          secret-key: ${JWT_SECRET}
 
   cloud:
     gateway:
       routes:
         - id: patient-service-route
-          uri: http://patient-service:5001
+          uri: http://patient-service:8080
           predicates:
             - Path=/api/patients/**
             - Method=GET

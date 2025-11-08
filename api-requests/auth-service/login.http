@@ -1,0 +1,8 @@
+### POST request to example server
+POST http://localhost:5006/auth/login
+Content-Type: application/json
+
+{
+  "userName": "ritik1",
+  "password": "password"
+}

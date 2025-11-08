@@ -14,6 +14,4 @@ public class UserLoginResponse {
     private String emailId;
     private ArrayList<String> roles;
     private String token;
-    private String membership;
-
 }

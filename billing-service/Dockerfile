@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for building and running a Spring Boot application, 2 stages: build jar and then run the jar.
 
-FROM maven:3.9.9-eclipse-temurin-21 AS builder
+FROM maven:3.9.9-amazoncorretto-21 AS builder
 #Use Maven with Eclipse Temurin JDK 21 as the build environment
 
 WORKDIR /app
@@ -31,7 +31,7 @@ COPY --from=builder ./app/target/billing-service-0.0.1-SNAPSHOT.jar ./app.jar
 # The source path is ./app/target/patient-service-0.0.1-SNAPSHOT.jar, and the destination path is ./app.jar.
 # This results in the JAR file being renamed to app.jar in the runner stage.
 
-EXPOSE 5002
+EXPOSE 8080
 EXPOSE 9002
 # Expose port 5001 for the application to listen on
 ENTRYPOINT ["java", "-jar", "app.jar"]

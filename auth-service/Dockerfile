@@ -1,7 +1,3 @@
-# =====================================================================
-# Multi-stage Dockerfile for a Spring Boot app (API Gateway)
-# Strategy: build JAR with Maven (skipping tests), then run it on Corretto 21
-# =====================================================================
 
 # -------------------------
 # 1) BUILD STAGE
@@ -54,9 +50,20 @@ WORKDIR /app
 # Progress so far: The runnable artifact (app.jar) is now present in the runtime image.
 COPY --from=builder /app/target/*.jar /app/app.jar
 
-# Declare the port your Spring Boot app listens on (informational for users/tools).
-# Progress so far: Consumers of the image know the service expects to listen on 5004.
-EXPOSE 8080
+# Declare/tells the port your Spring Boot app listens on on the container not the local machine(informational for users/tools).
+# it doesn't actually go and run the application on that port, that is controlled by application.properties inside the jar. This simply declares it.
+# Progress so far: Consumers of the image know the service expects to listen on 8080.
+# (1) Declare both app and debug ports
+EXPOSE 8080 6006
+
+# (2) Add environment variable to enable remote debugging
+#JAVA_TOOL_OPTIONS → injects the Java Debug Wire Protocol (JDWP) agent into your JVM.
+# transport=dt_socket: communicate via TCP socket.
+# server=y: JVM listens for a debugger to attach.
+# suspend=n: don’t pause the app waiting for debugger.
+# address=*:${DEBUG_PORT:-6006}: listen on all interfaces, port 6006 (default).
+# The DEBUG_PORT environment variable is optional — if not provided, it defaults to 5005.
+ENV JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:${DEBUG_PORT:-6006}"
 
 # Start the Spring Boot application.
 # Progress so far: The image is fully runnable; `docker run` will launch the app.
