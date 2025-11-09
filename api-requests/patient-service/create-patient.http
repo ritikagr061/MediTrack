@@ -1,0 +1,13 @@
+### POST request to save a new patient
+POST http://localhost:8000/api/patients
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbElkIjoicml0aWsxQGV4YW1wbGUuY29tIiwiaWQiOjIsInN1YiI6InJpdGlrMSIsImlhdCI6MTc2MjY0MjU5MiwiZXhwIjoxNzYyNjQ0MzkyfQ.WGRRqYBrm6BZDW41UJ-Mvyr0nZLQhRJ3rrFGltYZfM0
+
+{
+  "name": "Ritik",
+  "email": "ritik12@gmail.com",
+  "address": "Noida, UP, India",
+  "dateOfBirth": "2000-06-21",
+  "registeredDate": "2024-05-31"
+}
+###

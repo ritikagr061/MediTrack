@@ -1,5 +1,9 @@
 server:
-  port: 5004
+  port: 8080
+
+#logging:
+#  level:
+#    org.springframework.cloud.gateway: DEBUG
 
 spring:
   application:
@@ -17,18 +21,18 @@ spring:
         - id: patient-service-route
           uri: http://patient-service:8080
           predicates:
-            - Path=/api/patients/**
-            - Method=GET
-            - Method=POST
-            - Method=PUT
-            - Method=DELETE
+            - Path=/api/patients,/api/patients/**
           filters:
             - StripPrefix=1
           ## filters are used to modify the request before forwarding it to the destination service.
           ## Here, strip-prefix=1 removes the first segment of the path (i.e., "api") before forwarding the request to the patient-service.
-            #        - id: appointment-service-route
-            #          uri: http://appointment-service:5002
-
+        - id: auth-service-route
+          uri: http://auth-service:8080
+          predicates:
+            - Path=/api/auth/**
+            - Method=POST
+          filters:
+            - StripPrefix=1
       #########################################################
       #  GLOBAL CORS CONFIGURATION
       #########################################################

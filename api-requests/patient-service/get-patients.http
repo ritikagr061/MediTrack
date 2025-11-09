@@ -1,0 +1,5 @@
+### GET request to fetch all patient listings
+GET http://localhost:8000/api/patients
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbElkIjoicml0aWsxQGV4YW1wbGUuY29tIiwiaWQiOjIsInN1YiI6InJpdGlrMSIsImlhdCI6MTc2MjY0MDE0OCwiZXhwIjoxNzYyNjQxOTQ4fQ.B8UUjgjNf0zzta_Z8Q_E6RCpFENW3lQUTav4XXoonBs
+Accept: application/json
+###

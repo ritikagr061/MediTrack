@@ -1,0 +1,11 @@
+### PUT request to update an existing patient
+PUT http://localhost:8000/api/patients/123e4567-e89b-12d3-a456-426614174000
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbElkIjoicml0aWsxQGV4YW1wbGUuY29tIiwiaWQiOjIsInN1YiI6InJpdGlrMSIsImlhdCI6MTc2MjY0MDE0OCwiZXhwIjoxNzYyNjQxOTQ4fQ.B8UUjgjNf0zzta_Z8Q_E6RCpFENW3lQUTav4XXoonBs
+
+{
+  "name": "updated name",
+  "email": "john.doe@example.com",
+  "address": "123 Main St, Springfield"
+}
+###
