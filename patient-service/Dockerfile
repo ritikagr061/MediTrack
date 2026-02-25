@@ -31,8 +31,12 @@ COPY --from=builder ./app/target/patient-service-0.0.1-SNAPSHOT.jar ./app.jar
 # The source path is ./app/target/patient-service-0.0.1-SNAPSHOT.jar, and the destination path is ./app.jar.
 # This results in the JAR file being renamed to app.jar in the runner stage.
 
-EXPOSE 8080
-# Expose port 5001 for the application to listen on
+EXPOSE 8080 8081
+# Expose port 8080 for the application and 8081 for remote debugging
+
+# Add environment variable to enable remote debugging
+ENV JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8081"
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
 # Set the entry point to run the application using the java -jar command
 # This command will be executed when the container starts, launching the Spring Boot application.

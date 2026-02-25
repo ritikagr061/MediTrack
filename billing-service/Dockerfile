@@ -20,5 +20,9 @@ COPY --from=builder ./app/target/billing-service-0.0.1-SNAPSHOT.jar ./app.jar
 
 EXPOSE 8080
 EXPOSE 9002
+EXPOSE 8081
+
+# Add environment variable to enable remote debugging
+ENV JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8081"
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
