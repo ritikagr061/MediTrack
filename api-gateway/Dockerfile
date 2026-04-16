@@ -56,7 +56,15 @@ COPY --from=builder /app/target/*.jar /app/app.jar
 
 # Declare the port your Spring Boot app listens on (informational for users/tools).
 # Progress so far: Consumers of the image know the service expects to listen on 8080.
-EXPOSE 8080
+EXPOSE 8080  8081
+
+# (2) Add environment variable to enable remote debugging
+#JAVA_TOOL_OPTIONS → injects the Java Debug Wire Protocol (JDWP) agent into your JVM.
+# transport=dt_socket: communicate via TCP socket.
+# server=y: JVM listens for a debugger to attach.
+# suspend=n: don't pause the app waiting for debugger.
+# address=*:8081: listen on all interfaces, port 8081.
+ENV JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8081"
 
 # Start the Spring Boot application.
 # Progress so far: The image is fully runnable; `docker run` will launch the app.

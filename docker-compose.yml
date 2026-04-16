@@ -80,8 +80,9 @@ services:
     container_name: api-gateway
     ports:
       - "8000:8080"
+      - "6001:8081"
     environment:
-      JWT_SECRET: "" #insert on your own
+      JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
     networks:
       - meditrack
     depends_on:
@@ -105,7 +106,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_SHOW_SQL: "true"
       SPRING_SQL_INIT_MODE: always
-      JWT_SECRET: ""
+      JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
     networks:
       - meditrack
     depends_on:
