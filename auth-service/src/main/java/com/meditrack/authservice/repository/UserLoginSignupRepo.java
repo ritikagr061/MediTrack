@@ -8,8 +8,19 @@ import java.util.Optional;
 
 @Repository
 public interface UserLoginSignupRepo extends JpaRepository<UserEntity, Long> {
-    public Optional<UserEntity> findByUserName(String userName);
-    public Optional<UserEntity> findByEmailId(String emailId);
-    public boolean existsByEmailId(String emailId);
-    public boolean existsByUserName(String userName);
+    Optional<UserEntity> findByUserName(String userName);
+
+    Optional<UserEntity> findByEmailId(String emailId);
+
+    boolean existsByEmailId(String emailId);
+
+    boolean existsByUserName(String userName);
+
+    Optional<UserEntity> findByEmailIdIgnoreCaseAndHospitalCodeIgnoreCase(String emailId, String hospitalCode);
+
+    Optional<UserEntity> findByUserNameIgnoreCaseAndHospitalCodeIgnoreCase(String userName, String hospitalCode);
+
+    boolean existsByEmailIdIgnoreCaseAndHospitalCodeIgnoreCase(String emailId, String hospitalCode);
+
+    boolean existsByUserNameIgnoreCaseAndHospitalCodeIgnoreCase(String userName, String hospitalCode);
 }

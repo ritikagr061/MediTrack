@@ -31,7 +31,7 @@ public class SpringSecurityConfig {
         http.csrf(customizer->customizer.disable());
         http.authorizeHttpRequests(customizer->customizer
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/auth/login","/auth/register-user")
+                .requestMatchers("/auth/login","/auth/register-user", "/auth/register", "/auth/hospitals/**")
                 .permitAll()
                 .anyRequest().authenticated())
         ;

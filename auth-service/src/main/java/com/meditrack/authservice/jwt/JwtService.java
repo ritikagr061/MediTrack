@@ -1,6 +1,5 @@
 package com.meditrack.authservice.jwt;
 
-
 import com.meditrack.authservice.entity.UserEntity;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -17,39 +16,30 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-
-/**
- * This jwt service
- * i) creates jwt token
- * ii) validates them
- * iii) extract Claims from them
- */
 @Service
 public class JwtService {
-
-    //will be used for signing jwts
-    //This key changes on every server restart — in real applications, you’d want to persist this in config or env var.
-    //private String secretkey = "";
     private final SecretKey secretKey;
 
-    //It uses HmacSHA256 to generate a symmetric key (used for signing JWTs).
-    public JwtService(@Value("${jwt.secret}")String secret ){
+    public JwtService(@Value("${jwt.secret}") String secret) {
         byte[] keyBytes = Base64.getDecoder().decode(secret);
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(String userName, UserEntity currentUser){
-        Map<String,Object> claims = new HashMap<>();
-        claims.put("id",currentUser.getId());
-        claims.put("emailId",currentUser.getEmailId());
-        //claims.put("roles",currentUser.get()); todo - need to add other relevant claims
+    public String generateToken(String userName, UserEntity currentUser) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("id", currentUser.getId());
+        claims.put("emailId", currentUser.getEmailId());
+        claims.put("fullName", currentUser.getFullName());
+        claims.put("hospitalId", currentUser.getHospitalId());
+        claims.put("hospitalCode", currentUser.getHospitalCode());
+        claims.put("role", currentUser.getRole().name());
 
         return Jwts.builder()
                 .claims()
                 .add(claims)
                 .subject(userName)
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis()+60*30*1000))
+                .expiration(new Date(System.currentTimeMillis() + 60 * 30 * 1000))
                 .and()
                 .signWith(getKey())
                 .compact();
@@ -60,7 +50,6 @@ public class JwtService {
     }
 
     public String extractUserName(String token) {
-        // extract the username from jwt token
         return extractClaim(token, Claims::getSubject);
     }
 
@@ -78,11 +67,8 @@ public class JwtService {
     }
 
     public boolean validateToken(String token, UserDetails userDetails) {
-//        final String userName = extractUserName(token);
-//        return (userName.equals(userDetails.getUsername()) && !isTokenExpired(token));
-        //todo check logic of .parseSignedClaims
         try {
-            Jwts.parser().verifyWith((SecretKey) secretKey)
+            Jwts.parser().verifyWith(secretKey)
                     .build()
                     .parseSignedClaims(token);
         } catch (JwtException e) {
@@ -100,7 +86,4 @@ public class JwtService {
     private Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
-
 }
-
-

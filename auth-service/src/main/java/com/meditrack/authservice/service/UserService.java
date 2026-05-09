@@ -2,117 +2,169 @@ package com.meditrack.authservice.service;
 
 import com.meditrack.authservice.dto.UserLoginRequest;
 import com.meditrack.authservice.dto.UserLoginResponse;
+import com.meditrack.authservice.dto.UserRegisterRequest;
 import com.meditrack.authservice.dto.UserRegisterResponse;
+import com.meditrack.authservice.entity.HospitalProxy;
 import com.meditrack.authservice.entity.UserEntity;
+import com.meditrack.authservice.entity.UserRole;
 import com.meditrack.authservice.jwt.JwtService;
+import com.meditrack.authservice.repository.HospitalProxyRepository;
 import com.meditrack.authservice.repository.UserLoginSignupRepo;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 public class UserService {
     @Autowired
     private UserLoginSignupRepo repo;
+
     @Autowired
-    AuthenticationManager authManager;
+    private JwtService jwtService;
+
     @Autowired
-    JwtService jwtService;
+    private HospitalProxyRepository hospitalProxyRepository;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(11);
 
-    public UserLoginResponse login(UserLoginRequest request){
-        UserEntity currentUser = null;
-
-        //handling the case where user passes emailId instead of userName so userName will be empty
-        if(request.getUserName()==null||request.getUserName().trim().isEmpty()){
-            currentUser=gerUserByEmail(request.getEmailId());
-            request.setUserName(currentUser.getUserName());
+    public UserLoginResponse login(UserLoginRequest request) {
+        UserLoginResponse response = new UserLoginResponse();
+        String hospitalCode = normalize(request.getHospitalCode());
+        if (hospitalCode == null) {
+            response.setMainCode(400);
+            response.setMessage("hospitalCode is required");
+            return response;
         }
-        UserLoginResponse ans = new UserLoginResponse();
-        try {
-            /*In the login method, authManager.authenticate() triggers Spring Security, which calls MyUserDetailService.loadUserByUsername()
-             to fetch user data from DB. It returns a UserPrincipal (implementing UserDetails). Spring Security then internally uses
-             encoder.matches(raw, hashed) to validate the password. If authentication passes, a JWT token is generated and returned.
-             but how does spring know that I have used bcrypt with the strength of 11 in this project?
-             when you encode a password, BCrypt stores the strength inside the hash itself! The resulting string looks like: $2a$10$Kwefp0xZbBYmFYlfh72hWeED0KZRkceEjh9W3vWh.1F4KzTrHnXhO  ← the `11` is embedded right after `$2a$`
-            */
-/*           you could have question such as how does AuthenticationManager know details of database basically we have MyUserDetailService
-             which implements UserDetailsService and is annotated with @Service so spring automatically picks it up as a bean
-             and AuthenticationManager internally uses this bean to fetch user details from DB.
-             Also, UserDetailsService has only one method loadUserByUsername which returns UserDetails object which has multiple methods 2 of these methods are getUsername() and getPassword()
-*/
-            Authentication auth = authManager.authenticate(new UsernamePasswordAuthenticationToken(request.getUserName(), request.getPassword()));
-            if (auth.isAuthenticated()) {
-                if(currentUser==null)
-                    currentUser = getUser(request.getUserName());
 
-                if (currentUser != null) {
-                    ans.setMainCode(200);
-                    ans.setMessage("user fetched successfully");
-                    ans.setUserName(currentUser.getUserName());
-                    ans.setEmailId(currentUser.getEmailId());
-                    //ans.setRoles(currentUser.getRoles());
-                } else {
-                    ans.setMainCode(404);
-                    ans.setMessage("user not found");
-                }
-                String token = jwtService.generateToken(request.getUserName(), currentUser);
-                ans.setToken(token);
-                return ans;
-            } else {
-                ans.setMainCode(404);
-                ans.setMessage("user not found");
-                return ans;
+        Optional<HospitalProxy> hospitalProxyOptional = hospitalProxyRepository.findByHospitalCodeIgnoreCase(hospitalCode);
+        if (hospitalProxyOptional.isEmpty()) {
+            response.setMainCode(404);
+            response.setMessage("Hospital login profile not found");
+            return response;
+        }
+
+        HospitalProxy hospitalProxy = hospitalProxyOptional.get();
+        if (!hospitalProxy.isActive()) {
+            response.setMainCode(403);
+            response.setMessage("Hospital login is inactive");
+            return response;
+        }
+
+        Optional<UserEntity> loginUser = findLoginUser(request, hospitalCode);
+        if (loginUser.isEmpty() || !loginUser.get().isActive()) {
+            response.setMainCode(404);
+            response.setMessage("User not found");
+            return response;
+        }
+
+        UserEntity currentUser = loginUser.get();
+        if (!encoder.matches(request.getPassword(), currentUser.getPassword())) {
+            response.setMainCode(401);
+            response.setMessage("Invalid credentials");
+            return response;
+        }
+
+        response.setMainCode(200);
+        response.setMessage("user fetched successfully");
+        response.setUserName(currentUser.getUserName());
+        response.setFullName(currentUser.getFullName());
+        response.setEmailId(currentUser.getEmailId());
+        response.setHospitalId(currentUser.getHospitalId());
+        response.setHospitalCode(currentUser.getHospitalCode());
+        response.setHospitalName(hospitalProxy.getHospitalName());
+        response.setRole(currentUser.getRole().name());
+        response.setRoles(new ArrayList<>(List.of("ROLE_" + currentUser.getRole().name())));
+        response.setToken(jwtService.generateToken(currentUser.getUserName(), currentUser));
+        return response;
+    }
+
+    public UserRegisterResponse saveUser(UserRegisterRequest request) {
+        UserRegisterResponse response = new UserRegisterResponse();
+        String hospitalCode = normalize(request.getHospitalCode());
+
+        if (hospitalCode == null || request.getHospitalId() == null) {
+            response.setMainCode(400);
+            response.setMessage("hospitalId and hospitalCode are required");
+            response.setErrorMessage("hospitalId and hospitalCode are required");
+            return response;
+        }
+
+        Optional<HospitalProxy> hospitalProxyOptional = hospitalProxyRepository.findByHospitalCodeIgnoreCase(hospitalCode);
+        if (hospitalProxyOptional.isEmpty()) {
+            response.setMainCode(404);
+            response.setMessage("hospital profile not found");
+            response.setErrorMessage("hospital profile not found");
+            return response;
+        }
+
+        if (!hospitalProxyOptional.get().isActive()) {
+            response.setMainCode(403);
+            response.setMessage("hospital is inactive");
+            response.setErrorMessage("hospital is inactive");
+            return response;
+        }
+
+        if (repo.existsByUserNameIgnoreCaseAndHospitalCodeIgnoreCase(request.getUserName(), hospitalCode)) {
+            response.setMainCode(403);
+            response.setMessage("userName has already been taken for this hospital");
+            response.setErrorMessage("userName has already been taken for this hospital");
+            return response;
+        }
+
+        if (repo.existsByEmailIdIgnoreCaseAndHospitalCodeIgnoreCase(request.getEmailId(), hospitalCode)) {
+            response.setMainCode(403);
+            response.setMessage("account with the email id already exists for this hospital");
+            response.setErrorMessage("account with the email id already exists for this hospital");
+            return response;
+        }
+
+        UserEntity user = UserEntity.builder()
+                .userName(request.getUserName())
+                .fullName(request.getFullName())
+                .emailId(request.getEmailId())
+                .phoneNumber(request.getPhoneNumber())
+                .password(encoder.encode(request.getPassword()))
+                .hospitalId(request.getHospitalId())
+                .hospitalCode(hospitalCode)
+                .role(UserRole.PATIENT)
+                .isActive(true)
+                .build();
+
+        UserEntity createdUser = repo.save(user);
+        response.setMainCode(200);
+        response.setMessage("The account with userName " + createdUser.getUserName() + " has been registered. Please login to your account");
+        response.setUserName(createdUser.getUserName());
+        response.setFullName(createdUser.getFullName());
+        response.setHospitalCode(createdUser.getHospitalCode());
+        response.setRole(UserRole.PATIENT.name());
+        return response;
+    }
+
+    private Optional<UserEntity> findLoginUser(UserLoginRequest request, String hospitalCode) {
+        String email = normalize(request.getEmailId());
+        if (email != null) {
+            Optional<UserEntity> byEmail = repo.findByEmailIdIgnoreCaseAndHospitalCodeIgnoreCase(email, hospitalCode);
+            if (byEmail.isPresent()) {
+                return byEmail;
             }
         }
-        catch (Exception e){
-            System.out.println(e.getMessage());
+
+        String userName = normalize(request.getUserName());
+        if (userName != null) {
+            return repo.findByUserNameIgnoreCaseAndHospitalCodeIgnoreCase(userName, hospitalCode);
         }
-        return null;
+
+        return Optional.empty();
     }
 
-    public UserEntity getUser(String userName){
-        //UserLoginResponse ans = new UserLoginResponse();
-        Optional<UserEntity> user=repo.findByUserName(userName);
-        return user.orElse(null);
-    }
-
-    public UserEntity gerUserByEmail(String emailId){
-        Optional<UserEntity> user=repo.findByEmailId(emailId);
-        return user.orElse(null);
-    }
-
-    public UserRegisterResponse saveUser(UserEntity myUser){
-        UserRegisterResponse ans = new UserRegisterResponse();
-        if(repo.existsByUserName(myUser.getUserName())){
-            ans.setMessage("userName has already been taken");
-            ans.setMainCode(403);
-            ans.setErrorMessage("userName has already been taken");
-            return ans;
+    private String normalize(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
         }
-        if(repo.existsByEmailId(myUser.getEmailId())){
-            ans.setMessage("account with the email id already exists");
-            ans.setMainCode(403);
-            ans.setErrorMessage("account with the email id already exists");
-            return ans;
-        }
-        String currPassword=myUser.getPassword();
-        myUser.setPassword(encoder.encode(currPassword)); //while storing we are converting the password to hash
-        //note that while authenticating the user password(done by spring security in the project)
-        //we do not encrypt the password again and check instead we internally use : encoder.matches(enteredPasswordInEnglish, storedHashedPassword);
-        //in $2a$10$Kwefp0xZbBYmFYlfh72hWeED0KZRkceEjh9W3vWh.1F4KzTrHnXhO , 2a is the algo of bycrypt, 10 is the strength, after $ first 22 chars are the salt(base 64 encoded) and remaining is the hashed password(again base 64).
-        //reason is because every time the hash changes because of different random salt.
-        UserEntity newMyUser = repo.save(myUser);
-        ans.setMainCode(200);
-        ans.setMessage("The account with userName "+newMyUser.getUserName()+" has been registered. Please login to your account");
-        return ans;
+        return value.trim();
     }
-
-
 }

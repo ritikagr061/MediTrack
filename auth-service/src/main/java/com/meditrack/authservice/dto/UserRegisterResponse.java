@@ -12,5 +12,7 @@ public class UserRegisterResponse {
     private String errorMessage;
     private String message;
     private String userName;
-
+    private String fullName;
+    private String hospitalCode;
+    private String role;
 }
