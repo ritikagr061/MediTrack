@@ -106,11 +106,14 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_SHOW_SQL: "true"
       SPRING_SQL_INIT_MODE: always
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
     networks:
       - meditrack
     depends_on:
       auth-service-db:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
 
   patient-service:
