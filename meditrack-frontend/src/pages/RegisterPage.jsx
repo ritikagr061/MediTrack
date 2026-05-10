@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import LoginForm from "../components/LoginForm.jsx";
+import RegisterForm from "../components/RegisterForm.jsx";
 import {
     buildLoginProfileUrl,
     DEFAULT_PROFILE,
@@ -9,20 +9,16 @@ import {
 } from "../lib/hospitalBranding.js";
 import "./LoginPage.css";
 
-export default function LoginPage() {
+export default function RegisterPage() {
     const { hospitalCode = DEFAULT_PROFILE.hospitalCode } = useParams();
     const [profile, setProfile] = useState(DEFAULT_PROFILE);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [reloadKey, setReloadKey] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
 
         async function loadHospitalProfile() {
-            setLoading(true);
-            setError("");
-
             try {
                 const response = await fetch(buildLoginProfileUrl(hospitalCode));
                 if (!response.ok) {
@@ -62,10 +58,10 @@ export default function LoginPage() {
         return () => {
             isMounted = false;
         };
-    }, [hospitalCode, reloadKey]);
+    }, [hospitalCode]);
 
     useEffect(() => {
-        document.title = `${profile.hospitalName} Login | MediTrack`;
+        document.title = `${profile.hospitalName} Register | MediTrack`;
     }, [profile.hospitalName]);
 
     const brandStyle = useMemo(
@@ -83,7 +79,7 @@ export default function LoginPage() {
             <section className="login-shell__frame">
                 <aside className="login-brand-panel">
                     <div className="login-brand-panel__top">
-                        <span className="login-brand-panel__eyebrow">Multi-hospital care workspace</span>
+                        <span className="login-brand-panel__eyebrow">Create a hospital account</span>
 
                         {profile.logoUrl ? (
                             <img className="login-brand-panel__logo" src={profile.logoUrl} alt={`${profile.hospitalName} logo`} />
@@ -95,22 +91,22 @@ export default function LoginPage() {
 
                         <div>
                             <h1>{profile.hospitalName}</h1>
-                            <p>{profile.hospitalMessage || "Secure access for patients and hospital teams."}</p>
+                            <p>Register once, then land in a role-specific care workspace designed for your part of the journey.</p>
                         </div>
                     </div>
 
                     <div className="login-brand-panel__bottom">
                         <div className="login-brand-stat">
-                            <strong>Patient access</strong>
-                            <span>Patients can review diagnoses, treatment context, and care updates.</span>
+                            <strong>Patients</strong>
+                            <span>Review diagnosis summaries and stay informed about care progress.</span>
                         </div>
                         <div className="login-brand-stat">
-                            <strong>Clinical workflows</strong>
-                            <span>Doctors and nurses sign into hospital-specific operational workspaces.</span>
+                            <strong>Clinicians</strong>
+                            <span>Access role-aware workspaces for appointments, encounters, and coordination.</span>
                         </div>
                         <div className="login-brand-stat">
-                            <strong>Admin visibility</strong>
-                            <span>Role-aware landing experiences keep each user focused on the right tasks.</span>
+                            <strong>Operations teams</strong>
+                            <span>Support admin, reception, and care workflows under one hospital identity.</span>
                         </div>
                     </div>
                 </aside>
@@ -120,44 +116,33 @@ export default function LoginPage() {
                         <div className="login-state">
                             <div className="login-state-card login-state-card--loading">
                                 <div className="login-state-card__spinner" aria-hidden="true" />
-                                <h2 className="login-state-card__title">Preparing your hospital workspace</h2>
-                                <p className="login-state-card__text">
-                                    Fetching branding and login configuration for <strong>{hospitalCode}</strong>.
-                                </p>
+                                <h2 className="login-state-card__title">Preparing registration</h2>
+                                <p className="login-state-card__text">Loading account setup details for {hospitalCode}.</p>
                             </div>
                         </div>
                     ) : error && !profile.hospitalId ? (
                         <div className="login-state">
                             <div className="login-state-card login-state-card--error">
-                                <h2 className="login-state-card__title">Hospital page unavailable</h2>
-                                <p className="login-state-card__text">
-                                    We could not load the login profile for <strong>{hospitalCode}</strong>.
-                                </p>
-                                <button type="button" className="login-state-card__action" onClick={() => setReloadKey((value) => value + 1)}>
-                                    Retry
-                                </button>
+                                <h2 className="login-state-card__title">Registration unavailable</h2>
+                                <p className="login-state-card__text">{error}</p>
                             </div>
                         </div>
                     ) : (
-                        <div className="login-form-card">
+                        <div className="login-form-card login-form-card--wide">
                             <div className="login-form-card__header">
-                                <span className="login-form-card__kicker">Hospital Sign In</span>
-                                <h2 className="login-form-card__title">Welcome back</h2>
+                                <span className="login-form-card__kicker">Hospital Registration</span>
+                                <h2 className="login-form-card__title">Create your access</h2>
                                 <p className="login-form-card__subtitle">
-                                    Sign in as a patient, doctor, nurse, admin, or support staff.
+                                    Register for the correct hospital and role before signing in.
                                 </p>
                             </div>
 
-                            <LoginForm
+                            <RegisterForm
                                 hospitalCode={profile.hospitalCode}
                                 hospitalName={profile.hospitalName}
                                 hospitalId={profile.hospitalId}
                                 hospitalActive={profile.isActive}
                             />
-
-                            <p className="login-footer-note">
-                                This sign-in page is scoped to <strong>{profile.hospitalName}</strong>.
-                            </p>
                         </div>
                     )}
                 </section>
