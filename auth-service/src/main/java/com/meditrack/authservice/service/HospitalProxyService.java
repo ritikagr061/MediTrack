@@ -8,10 +8,11 @@ import com.meditrack.authservice.entity.UserRole;
 import com.meditrack.authservice.exception.HospitalProxyNotFoundException;
 import com.meditrack.authservice.repository.HospitalProxyRepository;
 import com.meditrack.authservice.repository.UserLoginSignupRepo;
-import jakarta.annotation.PostConstruct;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.event.EventListener;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -33,17 +34,19 @@ public class HospitalProxyService {
     public HospitalLoginProfileResponse getByHospitalId(UUID hospitalId) {
         HospitalProxy hospitalProxy = hospitalProxyRepository.findById(hospitalId)
                 .orElseThrow(() -> new HospitalProxyNotFoundException("Hospital profile not found for id " + hospitalId));
+        provisionDefaultAccounts(hospitalProxy);
         return toResponse(hospitalProxy);
     }
 
     public HospitalLoginProfileResponse getByHospitalCode(String hospitalCode) {
         HospitalProxy hospitalProxy = hospitalProxyRepository.findByHospitalCodeIgnoreCase(hospitalCode)
                 .orElseThrow(() -> new HospitalProxyNotFoundException("Hospital profile not found for code " + hospitalCode));
+        provisionDefaultAccounts(hospitalProxy);
         return toResponse(hospitalProxy);
     }
 
-    @PostConstruct
     @Transactional
+    @EventListener(ApplicationReadyEvent.class)
     public void provisionDefaultsForExistingHospitals() {
         List<HospitalProxy> proxies = hospitalProxyRepository.findAll();
         proxies.forEach(this::provisionDefaultAccounts);
