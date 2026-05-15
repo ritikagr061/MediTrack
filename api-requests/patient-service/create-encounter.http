@@ -1,0 +1,17 @@
+### POST request to create a new encounter for an appointment
+POST http://localhost:8000/api/encounters
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "hospitalId": "11111111-1111-1111-1111-111111111111",
+  "patientId": "123e4567-e89b-12d3-a456-426614174000",
+  "appointmentId": "55555555-5555-5555-5555-555555555555",
+  "attendingDoctorId": "44444444-4444-4444-4444-444444444444",
+  "createdByDoctorId": "44444444-4444-4444-4444-444444444444",
+  "encounterType": "OPD",
+  "chiefComplaint": "Fever for 3 days",
+  "reasonText": "Routine OPD visit from booked appointment",
+  "locationType": "OPD_ROOM",
+  "locationText": "OPD Room 2"
+}

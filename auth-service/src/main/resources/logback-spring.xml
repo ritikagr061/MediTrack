@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Reads spring.application.name so every log has the service that produced it. -->
+    <springProperty scope="context" name="serviceName" source="spring.application.name"/>
+
+    <!-- Writes one JSON object per log line to stdout, which Docker/Filebeat can collect. -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- Encodes Logback events as structured JSON instead of plain text. -->
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <!-- Providers define which JSON fields are written for each log event. -->
+            <providers>
+                <!-- Event timestamp. Kibana recognizes @timestamp as the default time field. -->
+                <timestamp>
+                    <fieldName>@timestamp</fieldName>
+                </timestamp>
+
+                <!-- Log level such as INFO, WARN, or ERROR. -->
+                <logLevel>
+                    <fieldName>level</fieldName>
+                </logLevel>
+
+                <!-- The formatted log message from log.info/log.warn/log.error. -->
+                <message>
+                    <fieldName>message</fieldName>
+                </message>
+
+                <!-- Java logger name, usually the fully qualified class name. -->
+                <loggerName>
+                    <fieldName>logger.name</fieldName>
+                </loggerName>
+
+                <!-- Thread name that emitted the log. Useful during concurrency debugging. -->
+                <threadName>
+                    <fieldName>thread.name</fieldName>
+                </threadName>
+
+                <!-- Source code location fields. Useful for filtering by file.name in Kibana. -->
+                <callerData>
+                    <classFieldName>class.name</classFieldName>
+                    <methodFieldName>method.name</methodFieldName>
+                    <fileFieldName>file.name</fileFieldName>
+                    <lineFieldName>line.number</lineFieldName>
+                </callerData>
+
+                <!-- Includes all MDC values, including traceId from the request filter. -->
+                <mdc/>
+
+                <!-- Adds structured key-value arguments from logs, for example kv("http.status_code", 404). -->
+                <arguments/>
+
+                <!-- Full exception stacktrace when an exception is passed to the logger. -->
+                <stackTrace>
+                    <fieldName>stack_trace</fieldName>
+                </stackTrace>
+
+                <!-- Adds stable application fields and exposes traceId as trace.id for Kibana filters. -->
+                <pattern>
+                    <pattern>
+                        {
+                          "service.name": "${serviceName}",
+                          "trace.id": "%mdc{traceId}"
+                        }
+                    </pattern>
+                </pattern>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Root logger sends INFO and above logs to the JSON console appender. -->
+    <root level="INFO">
+        <appender-ref ref="JSON_CONSOLE"/>
+    </root>
+</configuration>

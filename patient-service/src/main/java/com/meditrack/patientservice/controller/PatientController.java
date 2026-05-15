@@ -44,7 +44,7 @@ public class PatientController {
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
             @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection) {
         Page<PatientResponseDTO> response = patientService.getPatients(search, hospitalId, isActive, page, size, sortBy,
                 sortDirection);
@@ -58,7 +58,7 @@ public class PatientController {
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
             @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection) {
         return ResponseEntity.ok(
                 patientService.getPatients(query, hospitalId, isActive, page, size, sortBy, sortDirection)

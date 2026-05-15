@@ -42,6 +42,63 @@ services:
       timeout: 3s
       retries: 5
 
+  appointment-service-db:
+    image: postgres:17
+    container_name: appointment-service-db
+    environment:
+      POSTGRES_DB: db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5006:5432"
+    volumes:
+      - appointment-db-data:/var/lib/postgresql/data
+    networks:
+      - meditrack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  notification-service-db:
+    image: postgres:17
+    container_name: notification-service-db
+    environment:
+      POSTGRES_DB: db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5007:5432"
+    volumes:
+      - notification-db-data:/var/lib/postgresql/data
+    networks:
+      - meditrack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  billing-service-db:
+    image: postgres:17
+    container_name: billing-service-db
+    environment:
+      POSTGRES_DB: db
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5009:5432"
+    volumes:
+      - billing-db-data:/var/lib/postgresql/data
+    networks:
+      - meditrack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   kafka:
     image: apache/kafka:3.9.1
     container_name: kafka
@@ -72,6 +129,67 @@ services:
   # Application Services
   # ──────────────────────────────────────────────
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - meditrack
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.3
+    container_name: logstash
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    networks:
+      - meditrack
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    container_name: kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - meditrack
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.3
+    container_name: filebeat
+    user: root
+    command: ["--strict.perms=false"]
+    volumes:
+      - ./elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - meditrack
+    depends_on:
+      logstash:
+        condition: service_started
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -89,6 +207,12 @@ services:
       auth-service:
         condition: service_started
       patient-service:
+        condition: service_started
+      appointment-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+      billing-service:
         condition: service_started
 
   auth-service:
@@ -140,6 +264,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      billing-service:
+        condition: service_started
 
   billing-service:
     build:
@@ -151,23 +277,69 @@ services:
       - "5002:8080"
       - "9002:9002"
       - "6004:8081"
-    networks:
-      - meditrack
-
-  analytics-service:
-    build:
-      context: ./analytics-service
-      dockerfile: Dockerfile
-    image: analytics-service:latest
-    container_name: analytics-service
-    ports:
-      - "5003:8080"
-      - "6005:8081"
     environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://billing-service-db:5432/db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_SQL_INIT_MODE: always
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     networks:
       - meditrack
     depends_on:
+      billing-service-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  appointment-service:
+    build:
+      context: ./appointment-service
+      dockerfile: Dockerfile
+    image: appointment-service:latest
+    container_name: appointment-service
+    ports:
+      - "5004:8080"
+      - "6006:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://appointment-service-db:5432/db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_SQL_INIT_MODE: always
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      PATIENT_SERVICE_URL: http://patient-service:8080
+    networks:
+      - meditrack
+    depends_on:
+      appointment-service-db:
+        condition: service_healthy
+      patient-service:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    image: notification-service:latest
+    container_name: notification-service
+    ports:
+      - "5008:8080"
+      - "6007:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://notification-service-db:5432/db
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_SQL_INIT_MODE: always
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    networks:
+      - meditrack
+    depends_on:
+      notification-service-db:
+        condition: service_healthy
       kafka:
         condition: service_healthy
 
@@ -179,4 +351,8 @@ networks:
 volumes:
   patient-db-data:
   auth-db-data:
+  appointment-db-data:
+  notification-db-data:
+  billing-db-data:
   kafka-data:
+  elasticsearch-data:

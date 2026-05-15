@@ -19,7 +19,7 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
             where (:hospitalId is null or p.hospitalId = :hospitalId)
               and (:isActive is null or p.isActive = :isActive)
               and (
-                    :search is null
+                    :search = ''
                     or lower(p.name) like lower(concat('%', :search, '%'))
                     or lower(p.email) like lower(concat('%', :search, '%'))
                     or lower(p.phone) like lower(concat('%', :search, '%'))

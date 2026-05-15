@@ -1,0 +1,1 @@
+{"type":"index-pattern","id":"meditrack-logs-data-view","attributes":{"title":"meditrack-logs-*","timeFieldName":"@timestamp","fieldAttrs":"{}","fieldFormatMap":"{}","runtimeFieldMap":"{}","sourceFilters":"[]","typeMeta":"{}","name":"MediTrack Logs"},"references":[]}

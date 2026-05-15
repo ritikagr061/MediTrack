@@ -84,3 +84,25 @@ SELECT
 WHERE NOT EXISTS (
     SELECT 1 FROM patient_diseases WHERE id = '33333333-3333-3333-3333-333333333333'
 );
+
+INSERT INTO medical_professionals (
+    id, hospital_id, user_id, name, role_type, specialty, registration_number, phone, email,
+    consultation_fee, is_active, created_at, updated_at
+)
+SELECT
+    '44444444-4444-4444-4444-444444444444',
+    '11111111-1111-1111-1111-111111111111',
+    NULL,
+    'Dr. Asha Mehra',
+    'DOCTOR',
+    'General Medicine',
+    'KMC-12345',
+    '9876511111',
+    'asha.mehra@citycare.example.com',
+    700.00,
+    TRUE,
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+WHERE NOT EXISTS (
+    SELECT 1 FROM medical_professionals WHERE id = '44444444-4444-4444-4444-444444444444'
+);

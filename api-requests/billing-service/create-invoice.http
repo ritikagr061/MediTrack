@@ -1,0 +1,21 @@
+### POST request to create an invoice
+POST http://localhost:8000/api/billing/invoices
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "hospitalId": "11111111-1111-1111-1111-111111111111",
+  "patientId": "123e4567-e89b-12d3-a456-426614174000",
+  "appointmentId": "55555555-5555-5555-5555-555555555555",
+  "invoiceType": "CONSULTATION",
+  "discountAmount": 0,
+  "taxAmount": 0,
+  "items": [
+    {
+      "itemName": "General consultation",
+      "itemType": "CONSULTATION_FEE",
+      "quantity": 1,
+      "unitAmount": 700
+    }
+  ]
+}

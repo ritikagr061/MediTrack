@@ -1,0 +1,11 @@
+### POST request to create a billing account
+POST http://localhost:8000/api/billing/accounts
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "hospitalId": "11111111-1111-1111-1111-111111111111",
+  "patientId": "123e4567-e89b-12d3-a456-426614174000",
+  "patientName": "John Doe",
+  "patientEmail": "john.doe@example.com"
+}

@@ -1,0 +1,39 @@
+filebeat.inputs:
+  - type: filestream
+    id: meditrack-docker-logs
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    parsers:
+      - container: ~
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+          add_error_key: true
+      - drop_event:
+          when:
+            not:
+              or:
+                - equals:
+                    container.name: "api-gateway"
+                - equals:
+                    container.name: "auth-service"
+                - equals:
+                    container.name: "patient-service"
+                - equals:
+                    container.name: "appointment-service"
+                - equals:
+                    container.name: "billing-service"
+                - equals:
+                    container.name: "notification-service"
+                - equals:
+                    container.name: "analytics-service"
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info

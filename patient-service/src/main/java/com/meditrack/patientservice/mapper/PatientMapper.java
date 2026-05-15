@@ -123,7 +123,7 @@ public final class PatientMapper {
         return patientDisease;
     }
 
-    public static PatientSummaryResponseDTO toSummaryDTO(Patient patient, long diseaseCount) {
+    public static PatientSummaryResponseDTO toSummaryDTO(Patient patient, long diseaseCount, long encounterCount) {
         return new PatientSummaryResponseDTO(
                 patient.getId(),
                 patient.getPatientCode(),
@@ -131,7 +131,7 @@ public final class PatientMapper {
                 patient.isActive(),
                 diseaseCount,
                 0L,
-                0L
+                encounterCount
         );
     }
 }

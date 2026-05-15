@@ -19,6 +19,7 @@ import com.meditrack.patientservice.model.Patient;
 import com.meditrack.patientservice.model.PatientDisease;
 import com.meditrack.patientservice.repository.PatientDiseaseRepository;
 import com.meditrack.patientservice.repository.PatientRepository;
+import com.meditrack.patientservice.repository.EncounterRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -31,21 +32,26 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 @Service
 public class PatientService {
     private static final Logger log = LoggerFactory.getLogger(PatientService.class);
 
     private final PatientRepository patientRepository;
     private final PatientDiseaseRepository patientDiseaseRepository;
+    private final EncounterRepository encounterRepository;
     private final BillingServiceGrpcClient billingServiceGrpcClient;
     private final KafkaProducer kafkaProducer;
 
     public PatientService(PatientRepository patientRepository,
                           PatientDiseaseRepository patientDiseaseRepository,
+                          EncounterRepository encounterRepository,
                           BillingServiceGrpcClient billingServiceGrpcClient,
                           KafkaProducer kafkaProducer) {
         this.patientRepository = patientRepository;
         this.patientDiseaseRepository = patientDiseaseRepository;
+        this.encounterRepository = encounterRepository;
         this.billingServiceGrpcClient = billingServiceGrpcClient;
         this.kafkaProducer = kafkaProducer;
     }
@@ -117,7 +123,8 @@ public class PatientService {
     public PatientSummaryResponseDTO getPatientSummary(UUID id) {
         Patient patient = findPatientOrThrow(id);
         long diseaseCount = patientDiseaseRepository.countByPatientId(id);
-        return PatientMapper.toSummaryDTO(patient, diseaseCount);
+        long encounterCount = encounterRepository.countByPatientId(id);
+        return PatientMapper.toSummaryDTO(patient, diseaseCount, encounterCount);
     }
 
     public PatientDuplicateCheckResponseDTO checkDuplicate(UUID hospitalId, String email, String phone,
@@ -204,7 +211,7 @@ public class PatientService {
 
     private String normalizeSearch(String search) {
         if (search == null || search.isBlank()) {
-            return null;
+            return "";
         }
         return search.trim();
     }
@@ -220,7 +227,14 @@ public class PatientService {
         try {
             billingServiceGrpcClient.createBillingAccount(patient.getId().toString(), patient.getName(), patient.getEmail());
         } catch (Exception ex) {
-            log.warn("Billing account creation failed for patient {}: {}", patient.getId(), ex.getMessage());
+            log.warn(
+                    "Billing account creation failed",
+                    kv("patient.id", patient.getId()),
+                    kv("downstream.service.name", "billing-service"),
+                    kv("rpc.system", "grpc"),
+                    kv("error.message", ex.getMessage()),
+                    ex
+            );
         }
     }
 
@@ -228,7 +242,15 @@ public class PatientService {
         try {
             kafkaProducer.createEvent(patient);
         } catch (Exception ex) {
-            log.warn("Kafka event publish failed for patient {}: {}", patient.getId(), ex.getMessage());
+            log.warn(
+                    "Kafka event publish failed",
+                    kv("patient.id", patient.getId()),
+                    kv("event.type", "PATIENT_CREATED"),
+                    kv("messaging.system", "kafka"),
+                    kv("messaging.destination.name", "patient"),
+                    kv("error.message", ex.getMessage()),
+                    ex
+            );
         }
     }
 }

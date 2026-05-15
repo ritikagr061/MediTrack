@@ -1,56 +1,134 @@
 package com.meditrack.patientservice.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
-import java.util.HashMap;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
+
+import static net.logstash.logback.argument.StructuredArguments.kv;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
-        return ResponseEntity.badRequest().body(errors);
+    public ResponseEntity<Map<String, Object>> handleMethodArgumentNotValidException(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request
+    ) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors()
+                .forEach(error -> fieldErrors.put(error.getField(), error.getDefaultMessage()));
+
+        return buildErrorResponse(
+                "Validation failed",
+                HttpStatus.BAD_REQUEST,
+                request,
+                ex,
+                fieldErrors,
+                false
+        );
     }
 
     @ExceptionHandler(EmailAlreadyExistsException.class)
-    public ResponseEntity<Map<String, String>> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
+    public ResponseEntity<Map<String, Object>> handleEmailAlreadyExistsException(
+            EmailAlreadyExistsException ex,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT, request, ex, null, false);
     }
 
-    @ExceptionHandler(PatientNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handlePatientNotFoundException(PatientNotFoundException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+    @ExceptionHandler({
+            PatientNotFoundException.class,
+            DiseaseNotFoundException.class,
+            HospitalNotFoundException.class,
+            MedicalProfessionalNotFoundException.class,
+            EncounterNotFoundException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleNotFound(RuntimeException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND, request, ex, null, false);
     }
 
-    @ExceptionHandler(DiseaseNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleDiseaseNotFoundException(DiseaseNotFoundException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+    @ExceptionHandler({
+            HospitalCodeAlreadyExistsException.class,
+            EncounterAlreadyExistsException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleConflict(RuntimeException ex, HttpServletRequest request) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT, request, ex, null, false);
     }
 
-    @ExceptionHandler(HospitalNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleHospitalNotFoundException(HospitalNotFoundException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+    @ExceptionHandler(InvalidEncounterException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidEncounterException(
+            InvalidEncounterException ex,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(ex.getMessage(), HttpStatus.BAD_REQUEST, request, ex, null, false);
     }
 
-    @ExceptionHandler(HospitalCodeAlreadyExistsException.class)
-    public ResponseEntity<Map<String, String>> handleHospitalCodeAlreadyExistsException(HospitalCodeAlreadyExistsException ex) {
-        return buildErrorResponse(ex.getMessage(), HttpStatus.CONFLICT);
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpectedException(Exception ex, HttpServletRequest request) {
+        return buildErrorResponse(
+                "Unexpected error while processing request",
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                request,
+                ex,
+                null,
+                true
+        );
     }
 
-    private ResponseEntity<Map<String, String>> buildErrorResponse(String message, HttpStatus status) {
-        Map<String, String> errors = new HashMap<>();
-        log.warn(message);
-        errors.put("exception", message);
-        return ResponseEntity.status(status).body(errors);
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(
+            String message,
+            HttpStatus status,
+            HttpServletRequest request,
+            Exception ex,
+            Map<String, String> fieldErrors,
+            boolean includeStacktrace
+    ) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("traceId", MDC.get("traceId"));
+        body.put("status", status.value());
+        body.put("error", status.getReasonPhrase());
+        body.put("message", message);
+        body.put("path", request.getRequestURI());
+        body.put("method", request.getMethod());
+
+        if (fieldErrors != null && !fieldErrors.isEmpty()) {
+            body.put("fieldErrors", fieldErrors);
+        }
+
+        if (includeStacktrace) {
+            log.error(
+                    "Request failed",
+                    kv("http.status_code", status.value()),
+                    kv("http.method", request.getMethod()),
+                    kv("url.path", request.getRequestURI()),
+                    kv("exception.type", ex.getClass().getName()),
+                    kv("error.message", ex.getMessage()),
+                    ex
+            );
+        } else {
+            log.warn(
+                    "Request rejected",
+                    kv("http.status_code", status.value()),
+                    kv("http.method", request.getMethod()),
+                    kv("url.path", request.getRequestURI()),
+                    kv("exception.type", ex.getClass().getName()),
+                    kv("error.message", message),
+                    kv("validation.errors", fieldErrors)
+            );
+        }
+
+        return ResponseEntity.status(status).body(body);
     }
 }

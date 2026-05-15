@@ -29,7 +29,7 @@ public class HospitalPatientController {
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "updatedAt") String sortBy,
             @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection) {
         return ResponseEntity.ok(
                 patientService.getPatients(search, hospitalId, isActive, page, size, sortBy, sortDirection)
