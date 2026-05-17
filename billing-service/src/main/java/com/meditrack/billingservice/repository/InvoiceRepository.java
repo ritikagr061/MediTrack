@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
+import java.util.Optional;
 
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
@@ -27,4 +28,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
                                    @Param("encounterId") UUID encounterId,
                                    @Param("status") InvoiceStatus status,
                                    Pageable pageable);
+
+    Optional<Invoice> findByIdAndHospitalId(UUID id, UUID hospitalId);
 }

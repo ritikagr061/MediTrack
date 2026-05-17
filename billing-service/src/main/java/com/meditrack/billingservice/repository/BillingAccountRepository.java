@@ -1,6 +1,8 @@
 package com.meditrack.billingservice.repository;
 
 import com.meditrack.billingservice.model.BillingAccount;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,4 +12,8 @@ import java.util.UUID;
 @Repository
 public interface BillingAccountRepository extends JpaRepository<BillingAccount, UUID> {
     Optional<BillingAccount> findByPatientId(UUID patientId);
+
+    Page<BillingAccount> findAllByHospitalId(UUID hospitalId, Pageable pageable);
+
+    Optional<BillingAccount> findByIdAndHospitalId(UUID id, UUID hospitalId);
 }

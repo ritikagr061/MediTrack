@@ -14,6 +14,8 @@ import com.meditrack.notificationservice.repository.NotificationDeliveryAttemptR
 import com.meditrack.notificationservice.repository.NotificationRequestRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -40,6 +42,7 @@ public class NotificationService {
     }
 
     @Transactional
+    @CacheEvict(value = "notification-service:notifications", allEntries = true)
     public NotificationResponseDTO createNotification(NotificationCreateRequestDTO request) {
         NotificationRequest notification = new NotificationRequest();
         notification.setHospitalId(request.getHospitalId());
@@ -58,6 +61,7 @@ public class NotificationService {
     }
 
     @Transactional
+    @CacheEvict(value = "notification-service:notifications", allEntries = true)
     public NotificationResponseDTO createNotificationFromEvent(NotificationEventDTO event) {
         NotificationChannel channel = event.getChannel() == null ? NotificationChannel.EMAIL : event.getChannel();
         String recipientAddress = resolveRecipientAddress(event, channel);
@@ -89,10 +93,17 @@ public class NotificationService {
                 .map(this::toDTO);
     }
 
+    @Cacheable(value = "notification-service:notifications", key = "#id")
     public NotificationResponseDTO getNotification(UUID id) {
         return toDTO(notificationRequestRepository.findById(id)
                 .orElseThrow(() -> new NotificationNotFoundException(
                         "Notification request with id " + id + " is not found")));
+    }
+
+    public NotificationResponseDTO getNotification(UUID id, UUID hospitalId) {
+        return toDTO(notificationRequestRepository.findByIdAndHospitalId(id, hospitalId)
+                .orElseThrow(() -> new NotificationNotFoundException(
+                        "Notification request with id " + id + " is not found for hospital " + hospitalId)));
     }
 
     private NotificationRequest saveAndDeliver(NotificationRequest notification) {

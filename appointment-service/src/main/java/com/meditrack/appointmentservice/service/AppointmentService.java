@@ -22,8 +22,12 @@ import com.meditrack.appointmentservice.repository.AppointmentRepository;
 import com.meditrack.appointmentservice.repository.AppointmentStatusHistoryRepository;
 import com.meditrack.appointmentservice.repository.DoctorScheduleRepository;
 import com.meditrack.appointmentservice.repository.DoctorTimeOffRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,7 +68,16 @@ public class AppointmentService {
     }
 
     @Transactional
+    @CacheEvict(value = "appointment-service:available-slots", allEntries = true)
     public AppointmentResponseDTO createAppointment(AppointmentCreateRequestDTO request) {
+        try {
+            return createAppointmentWithOptimisticSlotLock(request);
+        } catch (OptimisticLockingFailureException ex) {
+            throw new BookingConflictException("Requested appointment slot was booked by another request. Please select another slot.");
+        }
+    }
+
+    private AppointmentResponseDTO createAppointmentWithOptimisticSlotLock(AppointmentCreateRequestDTO request) {
         if (request.getDurationMinutes() == null || request.getDurationMinutes() <= 0) {
             throw new InvalidAppointmentRequestException("Appointment duration must be greater than zero");
         }
@@ -72,7 +85,8 @@ public class AppointmentService {
         OffsetDateTime endsAt = request.getStartsAt().plusMinutes(request.getDurationMinutes());
         PatientServiceClient.PatientServicePatient patient = validatePatient(request.getHospitalId(), request.getPatientId());
         PatientServiceClient.PatientServiceDoctor doctor = validateDoctor(request.getHospitalId(), request.getDoctorId());
-        validateDoctorAvailability(request.getHospitalId(), request.getDoctorId(), request.getStartsAt(), endsAt);
+        lockDoctorScheduleForBooking(request.getHospitalId(), request.getDoctorId(), request.getStartsAt(), endsAt);
+        validateDoctorTimeOff(request.getHospitalId(), request.getDoctorId(), request.getStartsAt(), endsAt);
         validateNoAppointmentClash(request.getHospitalId(), request.getDoctorId(), request.getPatientId(),
                 request.getStartsAt(), endsAt);
 
@@ -93,6 +107,7 @@ public class AppointmentService {
 
         Appointment saved = appointmentRepository.save(appointment);
         saveStatusHistory(saved.getId(), null, saved.getStatus(), request.getBookedByUserId(), "Appointment booked");
+        appointmentRepository.flush();
         publishAppointmentBookedNotification(saved, patient, doctor);
         return toDTO(saved);
     }
@@ -103,11 +118,20 @@ public class AppointmentService {
                 .map(this::toDTO);
     }
 
+    @Cacheable(value = "appointment-service:appointments", key = "#id")
     public AppointmentResponseDTO getAppointment(UUID id) {
         return toDTO(findAppointmentOrThrow(id));
     }
 
+    public AppointmentResponseDTO getAppointment(UUID id, UUID hospitalId) {
+        return toDTO(findAppointmentOrThrow(id, hospitalId));
+    }
+
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "appointment-service:doctor-schedules", allEntries = true),
+            @CacheEvict(value = "appointment-service:available-slots", allEntries = true)
+    })
     public DoctorScheduleResponseDTO createDoctorSchedule(DoctorScheduleCreateRequestDTO request) {
         validateDoctor(request.getHospitalId(), request.getDoctorId());
         if (!request.getEndTime().isAfter(request.getStartTime())) {
@@ -127,6 +151,7 @@ public class AppointmentService {
         return toDTO(doctorScheduleRepository.save(schedule));
     }
 
+    @Cacheable(value = "appointment-service:doctor-schedules", key = "#hospitalId + ':' + #doctorId")
     public List<DoctorScheduleResponseDTO> getDoctorSchedules(UUID hospitalId, UUID doctorId) {
         validateDoctor(hospitalId, doctorId);
         return doctorScheduleRepository.findActiveSchedules(hospitalId, doctorId)
@@ -136,6 +161,7 @@ public class AppointmentService {
     }
 
     @Transactional
+    @CacheEvict(value = "appointment-service:available-slots", allEntries = true)
     public void createDoctorTimeOff(DoctorTimeOffCreateRequestDTO request) {
         validateDoctor(request.getHospitalId(), request.getDoctorId());
         if (!request.getEndsAt().isAfter(request.getStartsAt())) {
@@ -152,6 +178,7 @@ public class AppointmentService {
         doctorTimeOffRepository.save(timeOff);
     }
 
+    @Cacheable(value = "appointment-service:available-slots", key = "#hospitalId + ':' + #doctorId + ':' + #date")
     public List<AvailableSlotResponseDTO> getAvailableSlots(UUID hospitalId, UUID doctorId, LocalDate date) {
         validateDoctor(hospitalId, doctorId);
         List<DoctorSchedule> schedules = doctorScheduleRepository
@@ -230,18 +257,23 @@ public class AppointmentService {
         notificationEventProducer.publish(event);
     }
 
-    private void validateDoctorAvailability(UUID hospitalId, UUID doctorId, OffsetDateTime startsAt,
-                                            OffsetDateTime endsAt) {
+    private void lockDoctorScheduleForBooking(UUID hospitalId, UUID doctorId, OffsetDateTime startsAt,
+                                              OffsetDateTime endsAt) {
         LocalTime startTime = startsAt.toLocalTime();
         LocalTime endTime = endsAt.toLocalTime();
         boolean insideSchedule = doctorScheduleRepository
-                .findActiveSchedulesForDay(hospitalId, doctorId, startsAt.getDayOfWeek())
+                .findActiveSchedulesContainingSlotForBooking(hospitalId, doctorId, startsAt.getDayOfWeek(), startTime, endTime)
                 .stream()
-                .anyMatch(schedule -> !startTime.isBefore(schedule.getStartTime()) && !endTime.isAfter(schedule.getEndTime()));
+                .findFirst()
+                .isPresent();
 
         if (!insideSchedule) {
             throw new BookingConflictException("Doctor is not scheduled for the requested time");
         }
+    }
+
+    private void validateDoctorTimeOff(UUID hospitalId, UUID doctorId, OffsetDateTime startsAt,
+                                       OffsetDateTime endsAt) {
         if (!doctorTimeOffRepository.findOverlaps(hospitalId, doctorId, startsAt, endsAt).isEmpty()) {
             throw new BookingConflictException("Doctor has time off during the requested slot");
         }
@@ -265,6 +297,12 @@ public class AppointmentService {
     private Appointment findAppointmentOrThrow(UUID id) {
         return appointmentRepository.findById(id)
                 .orElseThrow(() -> new AppointmentNotFoundException("Appointment with id " + id + " is not found"));
+    }
+
+    private Appointment findAppointmentOrThrow(UUID id, UUID hospitalId) {
+        return appointmentRepository.findByIdAndHospitalId(id, hospitalId)
+                .orElseThrow(() -> new AppointmentNotFoundException(
+                        "Appointment with id " + id + " is not found for hospital " + hospitalId));
     }
 
     private void saveStatusHistory(UUID appointmentId, AppointmentStatus fromStatus, AppointmentStatus toStatus,

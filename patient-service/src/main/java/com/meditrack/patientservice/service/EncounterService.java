@@ -20,6 +20,9 @@ import com.meditrack.patientservice.model.ProfessionalRoleType;
 import com.meditrack.patientservice.repository.EncounterRepository;
 import com.meditrack.patientservice.repository.MedicalProfessionalRepository;
 import com.meditrack.patientservice.repository.PatientRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -48,6 +51,7 @@ public class EncounterService {
     }
 
     @Transactional
+    @CacheEvict(value = "patient-service:patient-summaries", key = "#request.patientId")
     public EncounterResponseDTO createEncounter(EncounterCreateRequestDTO request) {
         Patient patient = validatePatient(request.getHospitalId(), request.getPatientId());
         MedicalProfessional attendingDoctor = validateDoctor(request.getHospitalId(), request.getAttendingDoctorId(), "Attending doctor");
@@ -99,11 +103,17 @@ public class EncounterService {
                 .map(this::toDTO);
     }
 
+    @Cacheable(value = "patient-service:encounters", key = "#id")
     public EncounterResponseDTO getEncounter(UUID id) {
         return toDTO(findEncounterOrThrow(id));
     }
 
+    public EncounterResponseDTO getEncounter(UUID id, UUID hospitalId) {
+        return toDTO(findEncounterOrThrow(id, hospitalId));
+    }
+
     @Transactional
+    @CacheEvict(value = "patient-service:encounters", key = "#id")
     public EncounterResponseDTO updateEncounter(UUID id, EncounterUpdateRequestDTO request) {
         Encounter encounter = findEncounterOrThrow(id);
         if (encounter.getStatus() == EncounterStatus.FINISHED || encounter.getStatus() == EncounterStatus.CANCELLED) {
@@ -127,6 +137,10 @@ public class EncounterService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "patient-service:encounters", key = "#id"),
+            @CacheEvict(value = "patient-service:patient-summaries", allEntries = true)
+    })
     public EncounterResponseDTO updateEncounterStatus(UUID id, EncounterStatusUpdateRequestDTO request) {
         Encounter encounter = findEncounterOrThrow(id);
         validateStatusTransition(encounter.getStatus(), request.getStatus());
@@ -200,6 +214,12 @@ public class EncounterService {
     private Encounter findEncounterOrThrow(UUID id) {
         return encounterRepository.findById(id)
                 .orElseThrow(() -> new EncounterNotFoundException("Encounter with id " + id + " is not found"));
+    }
+
+    private Encounter findEncounterOrThrow(UUID id, UUID hospitalId) {
+        return encounterRepository.findByIdAndHospitalId(id, hospitalId)
+                .orElseThrow(() -> new EncounterNotFoundException(
+                        "Encounter with id " + id + " is not found for hospital " + hospitalId));
     }
 
     private EncounterResponseDTO toDTO(Encounter encounter) {

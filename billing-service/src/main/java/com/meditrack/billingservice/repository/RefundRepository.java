@@ -23,4 +23,18 @@ public interface RefundRepository extends JpaRepository<Refund, UUID> {
                                   @Param("invoiceId") UUID invoiceId,
                                   @Param("status") RefundStatus status,
                                   Pageable pageable);
+
+    @Query("""
+            select r from Refund r
+            join Payment p on p.id = r.paymentId
+            where p.hospitalId = :hospitalId
+              and (:paymentId is null or r.paymentId = :paymentId)
+              and (:invoiceId is null or r.invoiceId = :invoiceId)
+              and (:status is null or r.status = :status)
+            """)
+    Page<Refund> findAllByHospitalAndFilters(@Param("hospitalId") UUID hospitalId,
+                                             @Param("paymentId") UUID paymentId,
+                                             @Param("invoiceId") UUID invoiceId,
+                                             @Param("status") RefundStatus status,
+                                             Pageable pageable);
 }

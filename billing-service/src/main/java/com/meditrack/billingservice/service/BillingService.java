@@ -7,6 +7,8 @@ import com.meditrack.billingservice.kafka.NotificationEvent;
 import com.meditrack.billingservice.kafka.NotificationEventProducer;
 import com.meditrack.billingservice.model.*;
 import com.meditrack.billingservice.repository.*;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -43,6 +45,7 @@ public class BillingService {
     }
 
     @Transactional
+    @CacheEvict(value = "billing-service:billing-accounts", allEntries = true)
     public BillingAccountResponseDTO createBillingAccount(BillingAccountCreateRequestDTO request) {
         BillingAccount account = billingAccountRepository.findByPatientId(request.getPatientId()).orElseGet(BillingAccount::new);
         account.setHospitalId(request.getHospitalId());
@@ -52,8 +55,13 @@ public class BillingService {
         return toDTO(billingAccountRepository.save(account));
     }
 
+    @Cacheable(value = "billing-service:billing-accounts", key = "#id")
     public BillingAccountResponseDTO getBillingAccount(UUID id) {
         return toDTO(findBillingAccountOrThrow(id));
+    }
+
+    public BillingAccountResponseDTO getBillingAccount(UUID id, UUID hospitalId) {
+        return toDTO(findBillingAccountOrThrow(id, hospitalId));
     }
 
     public Page<BillingAccountResponseDTO> getBillingAccounts(int page, int size) {
@@ -61,7 +69,14 @@ public class BillingService {
                 .map(this::toDTO);
     }
 
+    public Page<BillingAccountResponseDTO> getBillingAccounts(UUID hospitalId, int page, int size) {
+        return billingAccountRepository.findAllByHospitalId(
+                        hospitalId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .map(this::toDTO);
+    }
+
     @Transactional
+    @CacheEvict(value = "billing-service:invoices", allEntries = true)
     public InvoiceResponseDTO createInvoice(InvoiceCreateRequestDTO request) {
         BigDecimal subtotal = request.getItems().stream()
                 .map(item -> item.getUnitAmount().multiply(BigDecimal.valueOf(item.getQuantity())))
@@ -110,12 +125,19 @@ public class BillingService {
                 .map(invoice -> toDTO(invoice, invoiceItemRepository.findByInvoiceId(invoice.getId())));
     }
 
+    @Cacheable(value = "billing-service:invoices", key = "#id")
     public InvoiceResponseDTO getInvoice(UUID id) {
         Invoice invoice = findInvoiceOrThrow(id);
         return toDTO(invoice, invoiceItemRepository.findByInvoiceId(id));
     }
 
+    public InvoiceResponseDTO getInvoice(UUID id, UUID hospitalId) {
+        Invoice invoice = findInvoiceOrThrow(id, hospitalId);
+        return toDTO(invoice, invoiceItemRepository.findByInvoiceId(id));
+    }
+
     @Transactional
+    @CacheEvict(value = "billing-service:invoices", allEntries = true)
     public PaymentResponseDTO createPayment(PaymentCreateRequestDTO request) {
         Payment payment = new Payment();
         payment.setHospitalId(request.getHospitalId());
@@ -143,7 +165,14 @@ public class BillingService {
                 .map(this::toDTO);
     }
 
+    public void assertPaymentBelongsToHospital(UUID paymentId, UUID hospitalId) {
+        paymentRepository.findByIdAndHospitalId(paymentId, hospitalId)
+                .orElseThrow(() -> new BillingEntityNotFoundException(
+                        "Payment with id " + paymentId + " is not found for hospital " + hospitalId));
+    }
+
     @Transactional
+    @CacheEvict(value = "billing-service:invoices", allEntries = true)
     public RefundResponseDTO createRefund(RefundCreateRequestDTO request) {
         Payment payment = paymentRepository.findById(request.getPaymentId())
                 .orElseThrow(() -> new BillingEntityNotFoundException("Payment with id " + request.getPaymentId() + " is not found"));
@@ -170,11 +199,18 @@ public class BillingService {
                 .map(this::toDTO);
     }
 
+    public Page<RefundResponseDTO> getRefunds(UUID hospitalId, UUID paymentId, UUID invoiceId,
+                                              RefundStatus status, int page, int size) {
+        return refundRepository.findAllByHospitalAndFilters(hospitalId, paymentId, invoiceId, status,
+                        PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .map(this::toDTO);
+    }
+
     private void applySuccessfulPayment(Payment payment) {
         if (payment.getInvoiceId() == null) {
             return;
         }
-        Invoice invoice = findInvoiceOrThrow(payment.getInvoiceId());
+        Invoice invoice = findInvoiceOrThrow(payment.getInvoiceId(), payment.getHospitalId());
         BigDecimal due = invoice.getDueAmount().subtract(payment.getAmount()).max(BigDecimal.ZERO);
         invoice.setDueAmount(due);
         invoice.setStatus(due.compareTo(BigDecimal.ZERO) == 0 ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID);
@@ -230,9 +266,21 @@ public class BillingService {
                 .orElseThrow(() -> new BillingEntityNotFoundException("Billing account with id " + id + " is not found"));
     }
 
+    private BillingAccount findBillingAccountOrThrow(UUID id, UUID hospitalId) {
+        return billingAccountRepository.findByIdAndHospitalId(id, hospitalId)
+                .orElseThrow(() -> new BillingEntityNotFoundException(
+                        "Billing account with id " + id + " is not found for hospital " + hospitalId));
+    }
+
     private Invoice findInvoiceOrThrow(UUID id) {
         return invoiceRepository.findById(id)
                 .orElseThrow(() -> new BillingEntityNotFoundException("Invoice with id " + id + " is not found"));
+    }
+
+    private Invoice findInvoiceOrThrow(UUID id, UUID hospitalId) {
+        return invoiceRepository.findByIdAndHospitalId(id, hospitalId)
+                .orElseThrow(() -> new BillingEntityNotFoundException(
+                        "Invoice with id " + id + " is not found for hospital " + hospitalId));
     }
 
     private BigDecimal defaultAmount(BigDecimal amount) {

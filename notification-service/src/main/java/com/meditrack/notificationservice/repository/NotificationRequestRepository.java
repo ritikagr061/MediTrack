@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
+import java.util.Optional;
 
 @Repository
 public interface NotificationRequestRepository extends JpaRepository<NotificationRequest, UUID> {
@@ -23,4 +24,6 @@ public interface NotificationRequestRepository extends JpaRepository<Notificatio
                                                @Param("patientId") UUID patientId,
                                                @Param("status") NotificationStatus status,
                                                Pageable pageable);
+
+    Optional<NotificationRequest> findByIdAndHospitalId(UUID id, UUID hospitalId);
 }

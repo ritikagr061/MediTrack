@@ -10,6 +10,8 @@ import com.meditrack.authservice.repository.HospitalProxyRepository;
 import com.meditrack.authservice.repository.UserLoginSignupRepo;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.event.EventListener;
@@ -31,6 +33,7 @@ public class HospitalProxyService {
         this.userLoginSignupRepo = userLoginSignupRepo;
     }
 
+    @Cacheable(value = "auth-service:hospital-profiles", key = "'id:' + #hospitalId")
     public HospitalLoginProfileResponse getByHospitalId(UUID hospitalId) {
         HospitalProxy hospitalProxy = hospitalProxyRepository.findById(hospitalId)
                 .orElseThrow(() -> new HospitalProxyNotFoundException("Hospital profile not found for id " + hospitalId));
@@ -38,6 +41,7 @@ public class HospitalProxyService {
         return toResponse(hospitalProxy);
     }
 
+    @Cacheable(value = "auth-service:hospital-profiles", key = "'code:' + #hospitalCode.toLowerCase()")
     public HospitalLoginProfileResponse getByHospitalCode(String hospitalCode) {
         HospitalProxy hospitalProxy = hospitalProxyRepository.findByHospitalCodeIgnoreCase(hospitalCode)
                 .orElseThrow(() -> new HospitalProxyNotFoundException("Hospital profile not found for code " + hospitalCode));
@@ -53,6 +57,7 @@ public class HospitalProxyService {
     }
 
     @Transactional
+    @CacheEvict(value = "auth-service:hospital-profiles", allEntries = true)
     public void upsertFromSyncEvent(HospitalSyncEventPayload payload) {
         HospitalProxy hospitalProxy = hospitalProxyRepository.findById(payload.getHospitalId())
                 .orElse(HospitalProxy.builder().hospitalId(payload.getHospitalId()).build());

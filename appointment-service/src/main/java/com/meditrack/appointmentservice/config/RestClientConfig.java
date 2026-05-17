@@ -4,6 +4,9 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.client.RestClient;
 
 @Configuration
@@ -19,6 +22,14 @@ public class RestClientConfig {
                     String traceId = MDC.get(TRACE_ID_MDC_KEY);
                     if (traceId != null && !traceId.isBlank()) {
                         request.getHeaders().set(TRACE_ID_HEADER, traceId);
+                    }
+                    ServletRequestAttributes attributes =
+                            (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+                    if (attributes != null) {
+                        String authorization = attributes.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+                        if (authorization != null && !authorization.isBlank()) {
+                            request.getHeaders().set(HttpHeaders.AUTHORIZATION, authorization);
+                        }
                     }
                     return execution.execute(request, body);
                 })

@@ -22,6 +22,9 @@ import com.meditrack.patientservice.repository.PatientRepository;
 import com.meditrack.patientservice.repository.EncounterRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -64,11 +67,17 @@ public class PatientService {
                 .map(PatientMapper::toDTO);
     }
 
+    @Cacheable(value = "patient-service:patients", key = "#id")
     public PatientResponseDTO getPatientById(UUID id) {
         return PatientMapper.toDTO(findPatientOrThrow(id));
     }
 
+    public PatientResponseDTO getPatientById(UUID id, UUID hospitalId) {
+        return PatientMapper.toDTO(findPatientOrThrow(id, hospitalId));
+    }
+
     @Transactional
+    @CacheEvict(value = {"patient-service:patients", "patient-service:patient-summaries"}, allEntries = true)
     public PatientResponseDTO savePatient(PatientCreateRequestDTO request) {
         validateUniqueEmail(request.getHospitalId(), request.getEmail(), null);
         Patient patient = patientRepository.save(PatientMapper.toModel(request));
@@ -78,6 +87,10 @@ public class PatientService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "patient-service:patients", key = "#id"),
+            @CacheEvict(value = "patient-service:patient-summaries", key = "#id")
+    })
     public PatientResponseDTO updatePatient(PatientUpdateRequestDTO request, UUID id) {
         Patient patient = findPatientOrThrow(id);
 
@@ -114,14 +127,26 @@ public class PatientService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "patient-service:patients", key = "#id"),
+            @CacheEvict(value = "patient-service:patient-summaries", key = "#id")
+    })
     public PatientResponseDTO updatePatientStatus(UUID id, PatientStatusUpdateRequestDTO request) {
         Patient patient = findPatientOrThrow(id);
         patient.setActive(request.getIsActive());
         return PatientMapper.toDTO(patientRepository.save(patient));
     }
 
+    @Cacheable(value = "patient-service:patient-summaries", key = "#id")
     public PatientSummaryResponseDTO getPatientSummary(UUID id) {
         Patient patient = findPatientOrThrow(id);
+        long diseaseCount = patientDiseaseRepository.countByPatientId(id);
+        long encounterCount = encounterRepository.countByPatientId(id);
+        return PatientMapper.toSummaryDTO(patient, diseaseCount, encounterCount);
+    }
+
+    public PatientSummaryResponseDTO getPatientSummary(UUID id, UUID hospitalId) {
+        Patient patient = findPatientOrThrow(id, hospitalId);
         long diseaseCount = patientDiseaseRepository.countByPatientId(id);
         long encounterCount = encounterRepository.countByPatientId(id);
         return PatientMapper.toSummaryDTO(patient, diseaseCount, encounterCount);
@@ -144,12 +169,24 @@ public class PatientService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "patient-service:patient-diseases", key = "#patientId"),
+            @CacheEvict(value = "patient-service:patient-summaries", key = "#patientId")
+    })
     public PatientDiseaseResponseDTO addDisease(UUID patientId, PatientDiseaseCreateRequestDTO request) {
         Patient patient = findPatientOrThrow(patientId);
         PatientDisease patientDisease = patientDiseaseRepository.save(PatientMapper.toDiseaseModel(patient, request));
         return PatientMapper.toDiseaseDTO(patientDisease);
     }
 
+    @Transactional
+    public PatientDiseaseResponseDTO addDisease(UUID patientId, UUID hospitalId, PatientDiseaseCreateRequestDTO request) {
+        Patient patient = findPatientOrThrow(patientId, hospitalId);
+        PatientDisease patientDisease = patientDiseaseRepository.save(PatientMapper.toDiseaseModel(patient, request));
+        return PatientMapper.toDiseaseDTO(patientDisease);
+    }
+
+    @Cacheable(value = "patient-service:patient-diseases", key = "#patientId")
     public List<PatientDiseaseResponseDTO> getDiseases(UUID patientId) {
         findPatientOrThrow(patientId);
         return patientDiseaseRepository.findByPatientIdOrderByCreatedAtDesc(patientId)
@@ -158,7 +195,19 @@ public class PatientService {
                 .toList();
     }
 
+    public List<PatientDiseaseResponseDTO> getDiseases(UUID patientId, UUID hospitalId) {
+        findPatientOrThrow(patientId, hospitalId);
+        return patientDiseaseRepository.findByPatientIdOrderByCreatedAtDesc(patientId)
+                .stream()
+                .map(PatientMapper::toDiseaseDTO)
+                .toList();
+    }
+
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "patient-service:patient-diseases", key = "#patientId"),
+            @CacheEvict(value = "patient-service:patient-summaries", key = "#patientId")
+    })
     public PatientDiseaseResponseDTO updateDisease(UUID patientId, UUID diseaseId, PatientDiseaseUpdateRequestDTO request) {
         findPatientOrThrow(patientId);
         PatientDisease patientDisease = patientDiseaseRepository.findByIdAndPatientId(diseaseId, patientId)
@@ -185,6 +234,10 @@ public class PatientService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "patient-service:patient-diseases", key = "#patientId"),
+            @CacheEvict(value = "patient-service:patient-summaries", key = "#patientId")
+    })
     public void deleteDisease(UUID patientId, UUID diseaseId) {
         findPatientOrThrow(patientId);
         PatientDisease patientDisease = patientDiseaseRepository.findByIdAndPatientId(diseaseId, patientId)
@@ -196,6 +249,12 @@ public class PatientService {
     private Patient findPatientOrThrow(UUID id) {
         return patientRepository.findById(id)
                 .orElseThrow(() -> new PatientNotFoundException("Patient with the id " + id + " is not found"));
+    }
+
+    private Patient findPatientOrThrow(UUID id, UUID hospitalId) {
+        return patientRepository.findByIdAndHospitalId(id, hospitalId)
+                .orElseThrow(() -> new PatientNotFoundException(
+                        "Patient with the id " + id + " is not found for hospital " + hospitalId));
     }
 
     private void validateUniqueEmail(UUID hospitalId, String email, UUID currentPatientId) {

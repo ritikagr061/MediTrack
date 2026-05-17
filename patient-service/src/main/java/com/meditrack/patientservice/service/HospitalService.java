@@ -10,6 +10,8 @@ import com.meditrack.patientservice.kafka.KafkaProducer;
 import com.meditrack.patientservice.mapper.PatientMapper;
 import com.meditrack.patientservice.model.Hospital;
 import com.meditrack.patientservice.repository.HospitalRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,19 +37,23 @@ public class HospitalService {
                 .toList();
     }
 
+    @Cacheable(value = "patient-service:hospitals", key = "'id:' + #id")
     public HospitalResponseDTO getHospitalById(UUID id) {
         return PatientMapper.toHospitalDTO(findHospitalOrThrow(id));
     }
 
+    @Cacheable(value = "patient-service:hospitals", key = "'code:' + #code.toLowerCase()")
     public HospitalResponseDTO getHospitalByCode(String code) {
         return PatientMapper.toHospitalDTO(findHospitalByCodeOrThrow(code));
     }
 
+    @Cacheable(value = "patient-service:hospital-login-configs", key = "#code.toLowerCase()")
     public HospitalLoginConfigResponseDTO getHospitalLoginConfigByCode(String code) {
         return PatientMapper.toHospitalLoginConfigDTO(findHospitalByCodeOrThrow(code));
     }
 
     @Transactional
+    @CacheEvict(value = {"patient-service:hospitals", "patient-service:hospital-login-configs"}, allEntries = true)
     public HospitalResponseDTO createHospital(HospitalCreateRequestDTO request) {
         validateCodeUniqueness(request.getCode(), null);
         Hospital hospital = hospitalRepository.save(PatientMapper.toHospitalModel(request));
@@ -56,6 +62,7 @@ public class HospitalService {
     }
 
     @Transactional
+    @CacheEvict(value = {"patient-service:hospitals", "patient-service:hospital-login-configs"}, allEntries = true)
     public HospitalResponseDTO updateHospital(UUID id, HospitalUpdateRequestDTO request) {
         Hospital hospital = findHospitalOrThrow(id);
 

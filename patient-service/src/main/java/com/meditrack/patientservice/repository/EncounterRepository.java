@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -39,4 +40,6 @@ public interface EncounterRepository extends JpaRepository<Encounter, UUID> {
     boolean existsByAppointmentId(UUID appointmentId);
 
     long countByPatientId(UUID patientId);
+
+    Optional<Encounter> findByIdAndHospitalId(UUID id, UUID hospitalId);
 }

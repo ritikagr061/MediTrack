@@ -9,6 +9,11 @@ spring:
   application:
     name: api-gateway
 
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
   security:
     oauth2:
       resourceserver:
@@ -82,6 +87,12 @@ spring:
             allowCredentials: true                 # Allow sending cookies or Authorization headers in CORS requests
             maxAge: 3600                           # Cache preflight (OPTIONS) response for 1 hour in the browser
       default-filters:
+        - name: RequestRateLimiter
+          args:
+            key-resolver: "#{@rateLimitKeyResolver}"
+            redis-rate-limiter.replenishRate: ${RATE_LIMIT_REPLENISH_RATE:10}
+            redis-rate-limiter.burstCapacity: ${RATE_LIMIT_BURST_CAPACITY:20}
+            redis-rate-limiter.requestedTokens: ${RATE_LIMIT_REQUESTED_TOKENS:1}
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin RETAIN_UNIQUE
         # Removes duplicate 'Access-Control-Allow-*' headers that can appear
         # when multiple filters or layers add the same header.

@@ -6,6 +6,8 @@ import com.meditrack.patientservice.exception.MedicalProfessionalNotFoundExcepti
 import com.meditrack.patientservice.model.MedicalProfessional;
 import com.meditrack.patientservice.model.ProfessionalRoleType;
 import com.meditrack.patientservice.repository.MedicalProfessionalRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -38,10 +40,12 @@ public class MedicalProfessionalService {
                 .map(this::toDTO);
     }
 
+    @Cacheable(value = "patient-service:medical-professionals", key = "'id:' + #id")
     public MedicalProfessionalResponseDTO getMedicalProfessional(UUID id) {
         return toDTO(findByIdOrThrow(id));
     }
 
+    @Cacheable(value = "patient-service:medical-professionals", key = "'hospital:' + #hospitalId + ':id:' + #id")
     public MedicalProfessionalResponseDTO getMedicalProfessionalForHospital(UUID hospitalId, UUID id) {
         return toDTO(medicalProfessionalRepository.findByIdAndHospitalId(id, hospitalId)
                 .orElseThrow(() -> new MedicalProfessionalNotFoundException(
@@ -49,6 +53,7 @@ public class MedicalProfessionalService {
     }
 
     @Transactional
+    @CacheEvict(value = "patient-service:medical-professionals", allEntries = true)
     public MedicalProfessionalResponseDTO createMedicalProfessional(MedicalProfessionalCreateRequestDTO request) {
         MedicalProfessional professional = new MedicalProfessional();
         professional.setHospitalId(request.getHospitalId());

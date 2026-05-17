@@ -129,6 +129,19 @@ services:
   # Application Services
   # ──────────────────────────────────────────────
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - meditrack
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
     container_name: elasticsearch
@@ -201,9 +214,16 @@ services:
       - "6001:8081"
     environment:
       JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      RATE_LIMIT_REPLENISH_RATE: 10
+      RATE_LIMIT_BURST_CAPACITY: 20
+      RATE_LIMIT_REQUESTED_TOKENS: 1
     networks:
       - meditrack
     depends_on:
+      redis:
+        condition: service_healthy
       auth-service:
         condition: service_started
       patient-service:
@@ -231,6 +251,8 @@ services:
       SPRING_JPA_SHOW_SQL: "true"
       SPRING_SQL_INIT_MODE: always
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
     networks:
       - meditrack
@@ -238,6 +260,8 @@ services:
       auth-service-db:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   patient-service:
@@ -255,6 +279,9 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_SQL_INIT_MODE: always
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
       BILLING_SERVICE_ADDRESS: billing-service
       BILLING_SERVICE_GRPC_PORT: 9002
     networks:
@@ -263,6 +290,8 @@ services:
       patient-service-db:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       billing-service:
         condition: service_started
@@ -284,12 +313,17 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_SQL_INIT_MODE: always
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
     networks:
       - meditrack
     depends_on:
       billing-service-db:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   appointment-service:
@@ -308,6 +342,9 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_SQL_INIT_MODE: always
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
       PATIENT_SERVICE_URL: http://patient-service:8080
     networks:
       - meditrack
@@ -317,6 +354,8 @@ services:
       patient-service:
         condition: service_started
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   notification-service:
@@ -335,12 +374,17 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_SQL_INIT_MODE: always
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      JWT_SECRET: "mRv5x9M3uXj4z6YwV2nK8Qb1Hs7Lp0FdJc2Ta9ZeUq4="
     networks:
       - meditrack
     depends_on:
       notification-service-db:
         condition: service_healthy
       kafka:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 networks:

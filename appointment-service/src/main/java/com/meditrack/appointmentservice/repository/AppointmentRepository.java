@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -70,4 +71,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
                                                    @Param("startsAt") OffsetDateTime startsAt,
                                                    @Param("endsAt") OffsetDateTime endsAt,
                                                    @Param("statuses") Collection<AppointmentStatus> statuses);
+
+    Optional<Appointment> findByIdAndHospitalId(UUID id, UUID hospitalId);
 }
